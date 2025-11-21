@@ -1,0 +1,27 @@
+{
+  "name": "myrastreios",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/rastreio.js",
+  "scripts": {
+    "track": "node src/rastreio.js",
+    "monitor": "node src/rastreio.js --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuilhermeDuarte14511/MyRastreios.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/GuilhermeDuarte14511/MyRastreios/issues"
+  },
+  "homepage": "https://github.com/GuilhermeDuarte14511/MyRastreios#readme",
+  "description": "",
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3"
+  }
+}
