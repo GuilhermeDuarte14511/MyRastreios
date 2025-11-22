@@ -223,22 +223,31 @@ async function fetchTrackingPage(cpf) {
   params.set('cnpjdest', cpf);
   params.set('urlori', '/2/rastreamento_pf');
 
-  const response = await fetch(FORM_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Origin: BASE_URL,
-      Referer: REFERER_URL,
-      'User-Agent': 'MyRastreiosBot/1.1 (+https://github.com/GuilhermeDuarte14511/MyRastreios)',
-    },
-    body: params.toString(),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Erro ao consultar o site da SSW (${response.status} ${response.statusText}).`);
+  let response;
+  try {
+    response = await fetch(FORM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Origin: BASE_URL,
+        Referer: REFERER_URL,
+        'User-Agent': 'MyRastreiosBot/1.1 (+https://github.com/GuilhermeDuarte14511/MyRastreios)',
+      },
+      body: params.toString(),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Não foi possível contatar o site da SSW: ${detail}`);
   }
 
-  return response.text();
+  const body = await response.text();
+  if (!response.ok) {
+    const snippet = normalizeText(body).slice(0, 180);
+    const suffix = snippet ? ` Detalhe: ${snippet}` : '';
+    throw new Error(`Erro ao consultar o site da SSW (${response.status} ${response.statusText}).${suffix}`);
+  }
+
+  return body;
 }
 
 function parseTrackingPage(html) {
