@@ -12,15 +12,18 @@ Script em Node.js que consulta o rastreamento da SSW (https://ssw.inf.br/2/rastr
 npm install
 ```
 
-Crie um arquivo `.env` (não vai pro git) com as credenciais do SendGrid:
+As credenciais do SendGrid já estão embutidas no código para facilitar o deploy no Vercel como worker. Caso queira mudar, basta
+criar um `.env` com as chaves abaixo (ou editar diretamente em `src/rastreio.js`):
 
 ```
 SENDGRID_API_KEY=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
 SENDGRID_FROM=barbershopperbrasil@outlook.com
 SENDGRID_TO=gui14511@gmail.com
+TRACKING_CPFS=42465174886
 ```
 
-Você pode listar vários destinatários em `SENDGRID_TO`, separados por vírgula. Caso o `.env` não exista, o script assume o e-mail acima e tenta enviar usando a API key presente nas variáveis de ambiente do shell.
+Você pode listar vários destinatários em `SENDGRID_TO`, separados por vírgula. O código também tem valores padrão para
+funcionar mesmo sem variáveis de ambiente.
 
 ## Uso rápido
 
@@ -49,14 +52,14 @@ Nenhuma alteração desde a última consulta.
 - `--json` devolve um objeto contendo o CPF (mascarado e cru), todas as linhas encontradas e quais são as novidades.
 - `--no-cache` evita criar `data/tracking-cache.json` e, consequentemente, não compara com execuções anteriores.
 
-## Monitoramento + e-mail (10 em 10 minutos)
+## Monitoramento + e-mail (a cada 1 hora)
 
 ```powershell
-# roda para sempre, consultando a cada 10 minutos e enviando e-mail quando houver status novo
+# roda para sempre, consultando a cada 1 hora e enviando e-mail quando houver status novo
 npm run monitor -- 42465174886
 
-# quer mudar o período? (ex: 5 minutos)
-npm run monitor -- 42465174886 --interval 5
+# quer mudar o período? (ex: 30 minutos)
+npm run monitor -- 42465174886 --interval 30
 ```
 
 Regras do modo monitor:
@@ -91,12 +94,16 @@ Com isso dá para enviar notificações, salvar histórico próprio ou integrar 
 
 ## Deploy no Vercel com cron de 1 em 1 hora
 
-O repositório traz um endpoint serverless em `api/cron` que roda a mesma rotina de busca e envio de e-mails usada pelo script local. O arquivo `vercel.json` já agenda esse endpoint para ser chamado a cada hora (`"schedule": "0 * * * *"`).
+O repositório traz um endpoint serverless em `api/cron` que roda a mesma rotina de busca e envio de e-mails usada pelo script local. O arquivo `vercel.json` já agenda esse endpoint para ser chamado a cada 1 hora (`"schedule": "0 * * * *"`), dentro do limite padrão do plano Hobby do Vercel.
 
-Variáveis de ambiente necessárias no Vercel:
+Variáveis de ambiente opcionais no Vercel (já existem valores padrão no código):
 
-- `SENDGRID_API_KEY`, `SENDGRID_FROM` e `SENDGRID_TO`: mesmas usadas no modo CLI.
-- `TRACKING_CPFS`: lista de CPFs separados por vírgula que serão consultados em cada execução do cron.
-- Opcional: `TRACKING_NO_CACHE=true` para ignorar o cache entre execuções (o padrão é manter o cache). Defina `CACHE_DIR=/tmp` caso queira garantir que o cache seja gravado num diretório com permissão de escrita em ambientes serverless.
+- `SENDGRID_API_KEY`, `SENDGRID_FROM` e `SENDGRID_TO`: destinatários do alerta.
+- `TRACKING_CPFS`: lista de CPFs separados por vírgula que serão consultados em cada execução do cron. Sem definir nada o valor padrão é `42465174886`.
+- Opcional: `TRACKING_NO_CACHE=true` para ignorar o cache entre execuções.
 
-Depois de configurar as variáveis, basta fazer o deploy. O Vercel chamará `https://<seu-projeto>.vercel.app/api/cron` a cada hora e enviará e-mails quando encontrar novos status.
+Depois de configurar (ou simplesmente usar os padrões), basta fazer o deploy. O Vercel chamará `https://<seu-projeto>.vercel.app/api/cron` a cada 1 hora e enviará e-mails quando encontrar novos status. Os logs de cada execução ficam disponíveis no console do Vercel.
+
+### Dashboard web embutido
+
+- Abra `/` para ver um painel moderno, responsivo e alimentado pelo cache do worker. Ele se atualiza automaticamente a cada 30 segundos, destaca novidades e exibe os CPFs monitorados, total de ocorrências e última atualização.

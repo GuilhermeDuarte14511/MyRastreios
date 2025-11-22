@@ -4,18 +4,23 @@ import {
   performTrackingCheck,
   sanitizeCpf,
   sendNotificationEmail,
+  DEFAULT_CPFS,
 } from '../src/rastreio.js';
 
 function parseCpfList() {
-  const raw = process.env.TRACKING_CPFS || process.env.TRACKING_CPF || '';
-  return raw
+  const raw = process.env.TRACKING_CPFS || process.env.TRACKING_CPF || DEFAULT_CPFS.join(',');
+  const cpfs = raw
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
     .map(sanitizeCpf);
+
+  logWithTimestamp(`Lista de CPFs carregada (${cpfs.length} alvo(s)).`);
+  return cpfs;
 }
 
 export default async function handler(req, res) {
+  logWithTimestamp('Execução do cron disparada.');
   try {
     const cpfs = parseCpfList();
 
@@ -48,6 +53,7 @@ export default async function handler(req, res) {
       });
     }
 
+    logWithTimestamp('Execução concluída.');
     res.status(200).json({ ok: true, results });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
