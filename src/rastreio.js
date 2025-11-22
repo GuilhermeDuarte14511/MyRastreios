@@ -12,7 +12,8 @@ const REFERER_URL = `${BASE_URL}/2/rastreamento_pf`;
 const FORM_ENDPOINT = `${BASE_URL}/2/resultSSW_dest`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const CACHE_FILE = path.resolve(__dirname, '..', 'data', 'tracking-cache.json');
+const CACHE_DIR = process.env.CACHE_DIR || path.resolve(__dirname, '..', 'data');
+const CACHE_FILE = process.env.CACHE_FILE || path.resolve(CACHE_DIR, 'tracking-cache.json');
 const DEFAULT_INTERVAL_MINUTES = 10;
 const SENDGRID_DEFAULT_FROM = 'barbershopperbrasil@outlook.com';
 const SENDGRID_DEFAULT_TO = 'gui14511@gmail.com';
@@ -519,4 +520,15 @@ function handleError(error, asJson) {
   process.exit(1);
 }
 
-await main();
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  await main();
+}
+
+export {
+  CACHE_FILE,
+  performTrackingCheck,
+  sendNotificationEmail,
+  sanitizeCpf,
+  maskCpf,
+  logWithTimestamp,
+};
