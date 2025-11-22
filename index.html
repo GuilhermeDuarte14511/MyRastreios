@@ -260,6 +260,33 @@
         font-size: 12px;
         letter-spacing: 0.01em;
       }
+      .actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        border: none;
+        color: #0b0e16;
+        font-weight: 700;
+        padding: 12px 16px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: var(--shadow-sm);
+        transition: transform 120ms ease, opacity 120ms ease;
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .btn:not(:disabled):active {
+        transform: translateY(1px);
+      }
       @media (max-width: 960px) {
         .grid-two {
           grid-template-columns: 1fr;
@@ -275,11 +302,11 @@
   </head>
   <body>
     <header>
-      <div class="pill"><span class="dot-live"></span> Worker ativo (cron de 1 em 1 hora no Vercel)</div>
+      <div class="pill"><span class="dot-live"></span> Acionamento manual sob demanda</div>
       <h1>Monitor de <span>Rastreios</span></h1>
       <p>
-        Painel em tempo (quase) real do worker que consulta a SSW e envia e-mails via SendGrid sempre que um novo status
-        aparece. Os dados abaixo são lidos do cache mantido no servidor.
+        Painel para consultar manualmente a SSW e enviar e-mails via SendGrid sempre que um novo status aparece. Os dados
+        abaixo são lidos do cache mantido no servidor.
       </p>
       <div class="stats" id="stats">
         <div class="card">
@@ -309,9 +336,15 @@
       <section>
         <div class="panel-header">
           <h3>Histórico</h3>
-          <div class="refresh-indicator" id="last-refresh">
-            <span class="dot-live"></span>
-            Atualizando...
+          <div class="actions">
+            <button class="btn" id="trigger-btn" type="button">
+              <span>🔄</span>
+              Atualizar agora
+            </button>
+            <div class="refresh-indicator" id="last-refresh">
+              <span class="dot-live"></span>
+              Aguardando ação
+            </div>
           </div>
         </div>
         <ul class="timeline" id="timeline"></ul>
@@ -320,11 +353,11 @@
       <aside class="card">
         <h3>Detalhes do Worker</h3>
         <div class="stack">
-          <div class="pill"><span class="dot-live"></span> Cron: a cada 1 hora</div>
-          <div class="pill">Intervalo padrão do monitor CLI: 60 min</div>
+          <div class="pill"><span class="dot-live"></span> Execução manual quando você quiser</div>
+          <div class="pill">Intervalo do monitor CLI continua disponível (60 min)</div>
         </div>
         <p class="small" style="margin-top: 12px;">
-          Logs completos ficam no console do Vercel a cada execução do cron. E-mails são disparados sempre que novos status são
+          Logs completos ficam no console do Vercel a cada execução manual. E-mails são disparados sempre que novos status são
           detectados. O cache fica em <code>/tmp/rastreio-cache</code> para compatibilidade com o ambiente serverless.
         </p>
         <div class="tags" id="summary-tags"></div>
@@ -332,7 +365,7 @@
     </div>
 
     <footer>
-      Painel responsivo • Atualização automática • Integrado ao cron serverless e aos alertas de e-mail SendGrid
+      Painel responsivo • Atualização manual sob demanda • Integrado aos alertas de e-mail SendGrid
     </footer>
 
     <script>
@@ -343,6 +376,7 @@
       const statUpdated = document.getElementById('stat-updated');
       const refreshIndicator = document.getElementById('last-refresh');
       const summaryTags = document.getElementById('summary-tags');
+      const triggerBtn = document.getElementById('trigger-btn');
 
       let lastEntryIds = new Set();
 
@@ -350,6 +384,30 @@
         return [cpf, entry.invoiceOrPickup || '', entry.orderOrRequest || '', entry.unit || '', entry.timestamp || '', entry.status || '']
           .map((v) => v || '')
           .join('|');
+      }
+
+      async function triggerManualRun() {
+        triggerBtn.disabled = true;
+        const previousLabel = triggerBtn.textContent;
+        triggerBtn.textContent = 'Atualizando...';
+        refreshIndicator.innerHTML = '<span class="dot-live"></span> Consultando a SSW...';
+
+        try {
+          const response = await fetch('/api/cron', { method: 'POST' });
+          if (!response.ok) throw new Error('Falha ao consultar a SSW');
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.error || 'Erro desconhecido');
+
+          const totalNew = payload.results.reduce((acc, item) => acc + (item.newEntries || 0), 0);
+          refreshIndicator.innerHTML = `<span class="dot-live"></span> Última execução manual: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${totalNew})`;
+          await fetchHistory();
+        } catch (error) {
+          refreshIndicator.textContent = error.message;
+          console.error('[manual-run]', error);
+        } finally {
+          triggerBtn.disabled = false;
+          triggerBtn.textContent = previousLabel;
+        }
       }
 
       async function fetchHistory() {
@@ -371,7 +429,7 @@
       function renderHistory(history) {
         if (!history.length) {
           hintEl.style.display = 'block';
-          hintEl.textContent = 'Nenhum histórico disponível ainda. Aguarde a próxima execução do cron.';
+          hintEl.textContent = 'Nenhum histórico disponível ainda. Execute uma consulta manual para preencher a lista.';
           timelineEl.innerHTML = '';
           statCpfs.textContent = '0';
           statTotal.textContent = '0';
@@ -431,6 +489,7 @@
       }
 
       fetchHistory();
+      triggerBtn.addEventListener('click', triggerManualRun);
       setInterval(fetchHistory, 30_000);
     </script>
   </body>

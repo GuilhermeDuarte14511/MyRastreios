@@ -20,7 +20,13 @@ function parseCpfList() {
 }
 
 export default async function handler(req, res) {
-  logWithTimestamp('Execução do cron disparada.');
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ ok: false, error: 'Use POST para iniciar a atualização manual.' });
+    return;
+  }
+
+  logWithTimestamp('Execução manual disparada.');
   try {
     const cpfs = parseCpfList();
 
