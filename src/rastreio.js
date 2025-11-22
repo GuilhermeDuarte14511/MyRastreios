@@ -12,21 +12,22 @@ const REFERER_URL = `${BASE_URL}/2/rastreamento_pf`;
 const FORM_ENDPOINT = `${BASE_URL}/2/resultSSW_dest`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const CACHE_FILE = path.resolve(__dirname, '..', 'data', 'tracking-cache.json');
-const DEFAULT_INTERVAL_MINUTES = 10;
+const CACHE_DIR = process.env.CACHE_DIR || '/tmp/rastreio-cache';
+const CACHE_FILE = process.env.CACHE_FILE || path.resolve(CACHE_DIR, 'tracking-cache.json');
+const DEFAULT_INTERVAL_MINUTES = 60;
+const SENDGRID_DEFAULT_API_KEY = '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';
 const SENDGRID_DEFAULT_FROM = 'barbershopperbrasil@outlook.com';
 const SENDGRID_DEFAULT_TO = 'gui14511@gmail.com';
+const DEFAULT_CPFS = ['42465174886'];
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? '';
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || SENDGRID_DEFAULT_API_KEY;
 const SENDGRID_FROM = process.env.SENDGRID_FROM || SENDGRID_DEFAULT_FROM;
 const SENDGRID_TO = (process.env.SENDGRID_TO || SENDGRID_DEFAULT_TO)
   .split(',')
   .map((email) => email.trim())
   .filter(Boolean);
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
+sgMail.setApiKey(SENDGRID_API_KEY);
 
 async function main() {
   const parsedArgs = parseCliArgs(process.argv.slice(2));
@@ -150,6 +151,7 @@ function maskCpf(value) {
 
 async function performTrackingCheck(cpf, flags) {
   const html = await fetchTrackingPage(cpf);
+  logWithTimestamp(`HTML baixado para ${maskCpf(cpf)} (tamanho ${html.length} bytes).`);
   const entries = parseTrackingPage(html);
 
   let previousEntries = [];
@@ -157,6 +159,7 @@ async function performTrackingCheck(cpf, flags) {
 
   if (!flags.noCache) {
     cache = await readCache();
+    logWithTimestamp(`Cache carregado (${Object.keys(cache).length} CPF(s) em memória).`);
     previousEntries = cache[cpf]?.entries ?? [];
   }
 
@@ -168,6 +171,7 @@ async function performTrackingCheck(cpf, flags) {
       entries,
     };
     await writeCache(cache);
+    logWithTimestamp(`Cache salvo com ${entries.length} linha(s) para ${maskCpf(cpf)}.`);
   }
 
   return {
@@ -181,13 +185,7 @@ async function performTrackingCheck(cpf, flags) {
 async function startWatchMode(cpf, flags) {
   console.log(`Monitorando ${maskCpf(cpf)} a cada ${flags.intervalMinutes} minuto(s).`);
 
-  if (!SENDGRID_API_KEY) {
-    console.warn('A variável SENDGRID_API_KEY não está configurada. Os e-mails não serão enviados.');
-  }
-
-  if (!SENDGRID_TO.length) {
-    console.warn('Nenhum destinatário configurado em SENDGRID_TO. Configure para receber os alertas.');
-  }
+  logSendgridConfiguration();
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -220,6 +218,7 @@ async function startWatchMode(cpf, flags) {
 }
 
 async function fetchTrackingPage(cpf) {
+  logWithTimestamp(`Iniciando fetch para ${maskCpf(cpf)}.`);
   const params = new URLSearchParams();
   params.set('cnpjdest', cpf);
   params.set('urlori', '/2/rastreamento_pf');
@@ -243,6 +242,7 @@ async function fetchTrackingPage(cpf) {
 }
 
 function parseTrackingPage(html) {
+  logWithTimestamp('Processando HTML retornado.');
   const $ = loadHtml(html);
   const tables = $('table');
   let resultTable;
@@ -360,6 +360,7 @@ function diffEntries(previous, current) {
   const prevIds = new Set((previous ?? []).map(buildEntryId));
   const currentIds = current.map(buildEntryId);
   const newEntries = current.filter((entry, idx) => !prevIds.has(currentIds[idx]));
+  logWithTimestamp(`Comparação de entradas: ${previous.length} anteriores, ${current.length} atuais, ${newEntries.length} novas.`);
 
   return {
     newEntries,
@@ -423,6 +424,7 @@ function printHumanReadable({ cpf, entries, diff, hadPreviousRun, cacheDisabled 
 }
 
 async function sendNotificationEmail({ cpf, newEntries }) {
+  logSendgridConfiguration();
   if (!SENDGRID_API_KEY || !SENDGRID_TO.length) {
     console.warn('Configuração do SendGrid ausente. Pular envio de e-mail.');
     return false;
@@ -454,6 +456,7 @@ async function sendNotificationEmail({ cpf, newEntries }) {
     text: textLines.join('\n'),
     html: `<p>${textLines[0]}</p><ul>${htmlItems}</ul>`,
   });
+  logWithTimestamp(`E-mail disparado via SendGrid para ${SENDGRID_TO.join(', ')} (assunto: "${subject}").`);
 
   return true;
 }
@@ -471,9 +474,11 @@ function printJson(payload) {
 async function readCache() {
   try {
     const content = await fs.readFile(CACHE_FILE, 'utf8');
+    logWithTimestamp(`Cache lido de ${CACHE_FILE}.`);
     return JSON.parse(content);
   } catch (error) {
     if (error.code === 'ENOENT') {
+      logWithTimestamp('Cache inexistente, iniciando do zero.');
       return {};
     }
     throw error;
@@ -494,19 +499,31 @@ function logWithTimestamp(message) {
   console.log(`[${new Date().toLocaleString()}] ${message}`);
 }
 
+function logSendgridConfiguration() {
+  if (!SENDGRID_API_KEY) {
+    console.warn('A variável SENDGRID_API_KEY não está configurada. Os e-mails não serão enviados.');
+  }
+
+  if (!SENDGRID_TO.length) {
+    console.warn('Nenhum destinatário configurado em SENDGRID_TO. Configure para receber os alertas.');
+  } else {
+    logWithTimestamp(`SendGrid apontando de ${SENDGRID_FROM} para ${SENDGRID_TO.join(', ')}.`);
+  }
+}
+
 function printUsage() {
   console.log('Uso: node src/rastreio.js <CPF> [--json] [--no-cache] [--watch] [--interval <minutos>]');
   console.log('');
   console.log('Exemplos:');
   console.log('  node src/rastreio.js 42465174886');
   console.log('  node src/rastreio.js 42465174886 --json');
-  console.log('  node src/rastreio.js 42465174886 --watch --interval 10');
+  console.log('  node src/rastreio.js 42465174886 --watch --interval 60');
   console.log('');
   console.log('Flags:');
   console.log('  --json          Retorna os dados em JSON para integrações.');
   console.log('  --no-cache      Não persiste nem consulta o cache local com o último resultado.');
   console.log('  --watch         Mantém o script rodando e envia e-mails quando surgirem novos status.');
-  console.log('  --interval N    Intervalo em minutos entre as consultas no modo watch (padrão: 10).');
+  console.log('  --interval N    Intervalo em minutos entre as consultas no modo watch (padrão: 60).');
 }
 
 function handleError(error, asJson) {
@@ -519,4 +536,17 @@ function handleError(error, asJson) {
   process.exit(1);
 }
 
-await main();
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  await main();
+}
+
+export {
+  CACHE_FILE,
+  DEFAULT_CPFS,
+  performTrackingCheck,
+  sendNotificationEmail,
+  sanitizeCpf,
+  maskCpf,
+  logWithTimestamp,
+  readCache,
+};

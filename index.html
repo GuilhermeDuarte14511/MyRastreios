@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyRastreios — Monitor de Status</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: radial-gradient(circle at 20% 20%, #0d111d, #080a12 55%);
+        --card: rgba(255, 255, 255, 0.04);
+        --card-strong: rgba(255, 255, 255, 0.08);
+        --border: rgba(255, 255, 255, 0.08);
+        --accent: #8b5cf6;
+        --accent-2: #22d3ee;
+        --success: #4ade80;
+        --muted: #9ca3af;
+        --text: #e5e7eb;
+        --glow: 0 16px 60px rgba(0, 0, 0, 0.35);
+        --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.25);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 32px 24px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      header h1 span {
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 800px;
+        line-height: 1.6;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        width: 100%;
+      }
+      .card {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 16px;
+        padding: 16px 18px;
+        backdrop-filter: blur(8px);
+        box-shadow: var(--shadow-sm);
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .card .value {
+        font-size: 28px;
+        font-weight: 700;
+      }
+      .grid-two {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 2fr 1fr;
+        width: 100%;
+      }
+      .panel {
+        margin: 16px 24px 0;
+        padding: 16px;
+        border-radius: 16px;
+        background: var(--card-strong);
+        border: 1px solid var(--border);
+        box-shadow: var(--glow);
+      }
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .panel-header h3 {
+        margin: 0;
+        font-size: 15px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .refresh-indicator {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .dot-live {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--success);
+        box-shadow: 0 0 0 8px rgba(74, 222, 128, 0.12);
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 8px rgba(74, 222, 128, 0.12);
+        }
+        50% {
+          transform: scale(1.05);
+          box-shadow: 0 0 0 12px rgba(74, 222, 128, 0.08);
+        }
+        100% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 8px rgba(74, 222, 128, 0.12);
+        }
+      }
+      .timeline {
+        padding: 0;
+        list-style: none;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 14px;
+        padding: 10px 0;
+        position: relative;
+      }
+      .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(180deg, var(--accent), transparent);
+        opacity: 0.4;
+      }
+      .dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 0 6px rgba(124, 93, 255, 0.14);
+        position: relative;
+        z-index: 1;
+        margin-top: 6px;
+      }
+      .item-body {
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 14px;
+        padding: 14px 16px;
+        box-shadow: var(--shadow-sm);
+        transition: transform 160ms ease, border-color 160ms ease;
+      }
+      .item-body.new {
+        border-color: rgba(34, 211, 238, 0.9);
+        transform: translateY(-2px);
+      }
+      .item-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+      .badge {
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: #cbd5e1;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 0 0 6px;
+      }
+      .desc {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .hint {
+        text-align: center;
+        color: var(--muted);
+        padding: 20px;
+      }
+      footer {
+        padding: 18px 24px 32px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 14px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border);
+        font-size: 14px;
+      }
+      .pill strong {
+        color: #fff;
+      }
+      .stack {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .small {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .tags {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      .tag {
+        padding: 6px 10px;
+        border-radius: 10px;
+        background: rgba(34, 211, 238, 0.08);
+        border: 1px solid rgba(34, 211, 238, 0.35);
+        color: #e0f2fe;
+        font-size: 12px;
+        letter-spacing: 0.01em;
+      }
+      @media (max-width: 960px) {
+        .grid-two {
+          grid-template-columns: 1fr;
+        }
+        header {
+          padding: 24px 18px 4px;
+        }
+        .panel {
+          margin: 12px 18px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="pill"><span class="dot-live"></span> Worker ativo (cron de 1 em 1 hora no Vercel)</div>
+      <h1>Monitor de <span>Rastreios</span></h1>
+      <p>
+        Painel em tempo (quase) real do worker que consulta a SSW e envia e-mails via SendGrid sempre que um novo status
+        aparece. Os dados abaixo são lidos do cache mantido no servidor.
+      </p>
+      <div class="stats" id="stats">
+        <div class="card">
+          <h3>CPFs monitorados</h3>
+          <div class="value" id="stat-cpfs">–</div>
+          <div class="small">Fonte: TRACKING_CPFS (ou padrão embutido)</div>
+        </div>
+        <div class="card">
+          <h3>Total de ocorrências</h3>
+          <div class="value" id="stat-total">–</div>
+          <div class="small">Soma de todas as linhas rastreadas</div>
+        </div>
+        <div class="card">
+          <h3>Última atualização</h3>
+          <div class="value" id="stat-updated">–</div>
+          <div class="small">A partir do cache salvo</div>
+        </div>
+        <div class="card">
+          <h3>Envio de alertas</h3>
+          <div class="value" id="stat-sendgrid">Configurado</div>
+          <div class="small">De barbershopperbrasil@outlook.com para gui14511@gmail.com</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid-two panel">
+      <section>
+        <div class="panel-header">
+          <h3>Histórico</h3>
+          <div class="refresh-indicator" id="last-refresh">
+            <span class="dot-live"></span>
+            Atualizando...
+          </div>
+        </div>
+        <ul class="timeline" id="timeline"></ul>
+        <div class="hint" id="hint">Carregando histórico...</div>
+      </section>
+      <aside class="card">
+        <h3>Detalhes do Worker</h3>
+        <div class="stack">
+          <div class="pill"><span class="dot-live"></span> Cron: a cada 1 hora</div>
+          <div class="pill">Intervalo padrão do monitor CLI: 60 min</div>
+        </div>
+        <p class="small" style="margin-top: 12px;">
+          Logs completos ficam no console do Vercel a cada execução do cron. E-mails são disparados sempre que novos status são
+          detectados. O cache fica em <code>/tmp/rastreio-cache</code> para compatibilidade com o ambiente serverless.
+        </p>
+        <div class="tags" id="summary-tags"></div>
+      </aside>
+    </div>
+
+    <footer>
+      Painel responsivo • Atualização automática • Integrado ao cron serverless e aos alertas de e-mail SendGrid
+    </footer>
+
+    <script>
+      const timelineEl = document.getElementById('timeline');
+      const hintEl = document.getElementById('hint');
+      const statCpfs = document.getElementById('stat-cpfs');
+      const statTotal = document.getElementById('stat-total');
+      const statUpdated = document.getElementById('stat-updated');
+      const refreshIndicator = document.getElementById('last-refresh');
+      const summaryTags = document.getElementById('summary-tags');
+
+      let lastEntryIds = new Set();
+
+      function buildEntryId(entry, cpf) {
+        return [cpf, entry.invoiceOrPickup || '', entry.orderOrRequest || '', entry.unit || '', entry.timestamp || '', entry.status || '']
+          .map((v) => v || '')
+          .join('|');
+      }
+
+      async function fetchHistory() {
+        refreshIndicator.innerHTML = '<span class="dot-live"></span> Atualizando...';
+        try {
+          const response = await fetch('/api/history');
+          if (!response.ok) throw new Error('Falha ao buscar histórico');
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.error || 'Erro desconhecido');
+          renderHistory(payload.history || []);
+          refreshIndicator.innerHTML = '<span class="dot-live"></span> Atualizado agora';
+        } catch (error) {
+          hintEl.textContent = error.message;
+          refreshIndicator.textContent = 'Erro ao atualizar';
+          console.error('[history]', error);
+        }
+      }
+
+      function renderHistory(history) {
+        if (!history.length) {
+          hintEl.style.display = 'block';
+          hintEl.textContent = 'Nenhum histórico disponível ainda. Aguarde a próxima execução do cron.';
+          timelineEl.innerHTML = '';
+          statCpfs.textContent = '0';
+          statTotal.textContent = '0';
+          statUpdated.textContent = '—';
+          summaryTags.innerHTML = '';
+          return;
+        }
+
+        hintEl.style.display = 'none';
+        timelineEl.innerHTML = '';
+        summaryTags.innerHTML = '';
+
+        const currentIds = new Set();
+        let totalEntries = 0;
+        let latestDate = null;
+        const sortedHistory = [...history].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+        sortedHistory.forEach((item) => {
+          totalEntries += item.total || 0;
+          if (item.updatedAt) {
+            const current = new Date(item.updatedAt);
+            if (!latestDate || current > latestDate) latestDate = current;
+          }
+
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = `${item.cpf} • ${item.total} ocorrência(s)`;
+          summaryTags.appendChild(tag);
+
+          (item.entries || []).forEach((entry, idx) => {
+            const entryId = buildEntryId(entry, item.cpf);
+            currentIds.add(entryId);
+
+            const li = document.createElement('li');
+            li.className = 'timeline-item';
+            li.innerHTML = `
+              <div class="dot"></div>
+              <div class="item-body ${lastEntryIds.has(entryId) ? '' : 'new'}">
+                <div class="item-title">${entry.status || 'Situação não informada'} <span class="badge">${item.cpf}</span></div>
+                <p class="meta">${entry.timestamp || 'Sem data'} • ${entry.unit || 'Unidade desconhecida'} • NF/Coleta: ${
+              entry.invoiceOrPickup || '-'
+            } • Pedido: ${entry.orderOrRequest || '-'}</p>
+                <p class="desc">${entry.description || 'Sem descrição'}</p>
+              </div>
+            `;
+            timelineEl.appendChild(li);
+          });
+        });
+
+        lastEntryIds = currentIds;
+
+        statCpfs.textContent = history.length;
+        statTotal.textContent = totalEntries;
+        statUpdated.textContent = latestDate
+          ? latestDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+          : '—';
+      }
+
+      fetchHistory();
+      setInterval(fetchHistory, 30_000);
+    </script>
+  </body>
+</html>
