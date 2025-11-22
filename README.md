@@ -88,3 +88,15 @@ Com isso dá para enviar notificações, salvar histórico próprio ou integrar 
 - `data/` e `.env*` estão no `.gitignore` porque o cache traz CPFs e tokens sensíveis.
 - Se o HTML da SSW mudar, o parser dispara um erro dizendo que não encontrou a tabela. Ajuste os seletores nesse caso.
 - Para rodar em background permanente, use `npm run monitor` numa sessão do PowerShell, `pm2`, agendador do Windows ou qualquer serviço que reinicie o processo em caso de queda.
+
+## Deploy no Vercel com cron de 1 em 1 hora
+
+O repositório traz um endpoint serverless em `api/cron` que roda a mesma rotina de busca e envio de e-mails usada pelo script local. O arquivo `vercel.json` já agenda esse endpoint para ser chamado a cada hora (`"schedule": "0 * * * *"`).
+
+Variáveis de ambiente necessárias no Vercel:
+
+- `SENDGRID_API_KEY`, `SENDGRID_FROM` e `SENDGRID_TO`: mesmas usadas no modo CLI.
+- `TRACKING_CPFS`: lista de CPFs separados por vírgula que serão consultados em cada execução do cron.
+- Opcional: `TRACKING_NO_CACHE=true` para ignorar o cache entre execuções (o padrão é manter o cache). Defina `CACHE_DIR=/tmp` caso queira garantir que o cache seja gravado num diretório com permissão de escrita em ambientes serverless.
+
+Depois de configurar as variáveis, basta fazer o deploy. O Vercel chamará `https://<seu-projeto>.vercel.app/api/cron` a cada hora e enviará e-mails quando encontrar novos status.
