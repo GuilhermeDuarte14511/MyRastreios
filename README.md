@@ -92,17 +92,9 @@ Com isso dá para enviar notificações, salvar histórico próprio ou integrar 
 - Se o HTML da SSW mudar, o parser dispara um erro dizendo que não encontrou a tabela. Ajuste os seletores nesse caso.
 - Para rodar em background permanente, use `npm run monitor` numa sessão do PowerShell, `pm2`, agendador do Windows ou qualquer serviço que reinicie o processo em caso de queda.
 
-## Deploy no Vercel com cron de 1 em 1 hora
+## Deploy no Vercel (apenas endpoints manuais)
 
-O repositório traz um endpoint serverless em `api/cron` que roda a mesma rotina de busca e envio de e-mails usada pelo script local. O arquivo `vercel.json` já agenda esse endpoint para ser chamado a cada 1 hora (`"schedule": "0 * * * *"`), dentro do limite padrão do plano Hobby do Vercel.
-
-Variáveis de ambiente opcionais no Vercel (já existem valores padrão no código):
-
-- `SENDGRID_API_KEY`, `SENDGRID_FROM` e `SENDGRID_TO`: destinatários do alerta.
-- `TRACKING_CPFS`: lista de CPFs separados por vírgula que serão consultados em cada execução do cron. Sem definir nada o valor padrão é `42465174886`.
-- Opcional: `TRACKING_NO_CACHE=true` para ignorar o cache entre execuções.
-
-Depois de configurar (ou simplesmente usar os padrões), basta fazer o deploy. O Vercel chamará `https://<seu-projeto>.vercel.app/api/cron` a cada 1 hora e enviará e-mails quando encontrar novos status. Os logs de cada execução ficam disponíveis no console do Vercel.
+O projeto continua preparado para rodar como funções serverless do Vercel, mas o cron agendado foi removido para evitar execuções automáticas. Você pode disparar consultas manuais via `api/track` e acompanhar o histórico em `api/history`, ambos já usando as credenciais e parâmetros padrão descritos acima.
 
 ### Dashboard web embutido
 
