@@ -63,7 +63,8 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true, results });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const status = error?.status && Number.isInteger(error.status) ? error.status : 500;
     console.error(message);
-    res.status(500).json({ ok: false, error: message });
+    res.status(status).json({ ok: false, error: message });
   }
 }

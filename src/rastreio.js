@@ -8,7 +8,7 @@ import process from 'process';
 import { fileURLToPath } from 'url';
 
 const BASE_URL = 'https://ssw.inf.br';
-const REFERER_URL = `${BASE_URL}/2/rastreamento_pf`;
+const REFERER_URL = `${BASE_URL}/2/rastreamento_pf?`;
 const FORM_ENDPOINT = `${BASE_URL}/2/resultSSW_dest`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -221,8 +221,36 @@ async function fetchTrackingPage(cpf) {
   logWithTimestamp(`Iniciando fetch para ${maskCpf(cpf)}.`);
   const params = new URLSearchParams();
   params.set('cnpjdest', cpf);
-  params.set('urlori', '/2/rastreamento_pf');
+  params.set('urlori', '/2/rastreamento_pf?');
 
+  // A SSW passou a exigir que a requisição POST carregue o cookie de sessão
+  // previamente emitido na página do formulário. Sem esse cookie, o endpoint
+  // responde 401 Unauthorized. Como o `fetch` nativo do Node não mantém
+  // cookies entre chamadas, fazemos um "warm-up" na página inicial para
+  // capturar o cookie e reutilizá-lo na chamada subsequente.
+  const cookies = await fetchSessionCookies();
+  const firstAttempt = await postTrackingForm(params, cookies);
+
+  if (firstAttempt.response.ok) {
+    return firstAttempt.body;
+  }
+
+  if ([401, 403].includes(firstAttempt.response.status)) {
+    logWithTimestamp('Sessão possivelmente expirada. Tentando renovar cookie e reenviar a requisição.');
+    const retryCookies = await fetchSessionCookies();
+    const retryAttempt = await postTrackingForm(params, retryCookies);
+
+    if (retryAttempt.response.ok) {
+      return retryAttempt.body;
+    }
+
+    throw buildSswError(retryAttempt.response, retryAttempt.body);
+  }
+
+  throw buildSswError(firstAttempt.response, firstAttempt.body);
+}
+
+async function postTrackingForm(params, cookies) {
   let response;
   try {
     response = await fetch(FORM_ENDPOINT, {
@@ -232,6 +260,7 @@ async function fetchTrackingPage(cpf) {
         Origin: BASE_URL,
         Referer: REFERER_URL,
         'User-Agent': 'MyRastreiosBot/1.1 (+https://github.com/GuilhermeDuarte14511/MyRastreios)',
+        ...(cookies.length ? { Cookie: cookies.join('; ') } : {}),
       },
       body: params.toString(),
     });
@@ -241,13 +270,41 @@ async function fetchTrackingPage(cpf) {
   }
 
   const body = await response.text();
-  if (!response.ok) {
-    const snippet = normalizeText(body).slice(0, 180);
-    const suffix = snippet ? ` Detalhe: ${snippet}` : '';
-    throw new Error(`Erro ao consultar o site da SSW (${response.status} ${response.statusText}).${suffix}`);
-  }
+  return { response, body };
+}
 
-  return body;
+function buildSswError(response, body) {
+  const snippet = normalizeText(body).slice(0, 180);
+  const suffix = snippet ? ` Detalhe: ${snippet}` : '';
+  const enrichedError = new Error(`Erro ao consultar o site da SSW (${response.status} ${response.statusText}).${suffix}`);
+  enrichedError.status = response.status;
+  return enrichedError;
+}
+
+async function fetchSessionCookies() {
+  try {
+    const response = await fetch(REFERER_URL, {
+      headers: {
+        'User-Agent': 'MyRastreiosBot/1.1 (+https://github.com/GuilhermeDuarte14511/MyRastreios)',
+        Referer: REFERER_URL,
+      },
+    });
+
+    // `getSetCookie` é exposto no fetch do Node (undici). Ele devolve todas
+    // as ocorrências de Set-Cookie; para o envio posterior só precisamos do
+    // valor bruto da chave, sem atributos como Path ou SameSite.
+    const setCookies = response.headers.getSetCookie?.() ?? [];
+    const parsed = setCookies.map((raw) => raw.split(';')[0]).filter(Boolean);
+    if (parsed.length) {
+      logWithTimestamp(`Cookie de sessão obtido (${parsed.join('; ')}).`);
+    } else {
+      logWithTimestamp('Nenhum cookie de sessão retornado pela página inicial.');
+    }
+    return parsed;
+  } catch (error) {
+    logWithTimestamp(`Falha ao iniciar sessão antes do POST: ${error.message || error}`);
+    return [];
+  }
 }
 
 function parseTrackingPage(html) {
