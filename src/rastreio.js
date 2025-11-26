@@ -219,17 +219,10 @@ async function startWatchMode(cpf, flags) {
 
 async function fetchTrackingPage(cpf) {
   logWithTimestamp(`Iniciando fetch para ${maskCpf(cpf)}.`);
-  const params = new URLSearchParams();
-  params.set('cnpjdest', cpf);
-  params.set('urlori', '/2/rastreamento_pf?');
+  const session = await fetchSessionData();
+  const params = buildFormParams(session.hiddenFields, cpf);
 
-  // A SSW passou a exigir que a requisição POST carregue o cookie de sessão
-  // previamente emitido na página do formulário. Sem esse cookie, o endpoint
-  // responde 401 Unauthorized. Como o `fetch` nativo do Node não mantém
-  // cookies entre chamadas, fazemos um "warm-up" na página inicial para
-  // capturar o cookie e reutilizá-lo na chamada subsequente.
-  const cookies = await fetchSessionCookies();
-  const firstAttempt = await postTrackingForm(params, cookies);
+  const firstAttempt = await postTrackingForm(params, session.cookies);
 
   if (firstAttempt.response.ok) {
     return firstAttempt.body;
@@ -237,8 +230,9 @@ async function fetchTrackingPage(cpf) {
 
   if ([401, 403].includes(firstAttempt.response.status)) {
     logWithTimestamp('Sessão possivelmente expirada. Tentando renovar cookie e reenviar a requisição.');
-    const retryCookies = await fetchSessionCookies();
-    const retryAttempt = await postTrackingForm(params, retryCookies);
+    const retrySession = await fetchSessionData();
+    const retryParams = buildFormParams(retrySession.hiddenFields, cpf);
+    const retryAttempt = await postTrackingForm(retryParams, retrySession.cookies);
 
     if (retryAttempt.response.ok) {
       return retryAttempt.body;
@@ -281,7 +275,23 @@ function buildSswError(response, body) {
   return enrichedError;
 }
 
-async function fetchSessionCookies() {
+function buildFormParams(hiddenFields, cpf) {
+  const params = new URLSearchParams();
+
+  Object.entries(hiddenFields || {}).forEach(([key, value]) => {
+    params.set(key, value);
+  });
+
+  params.set('cnpjdest', cpf);
+  if (!params.has('urlori')) {
+    params.set('urlori', '/2/rastreamento_pf?');
+  }
+
+  return params;
+}
+
+async function fetchSessionData() {
+  let body = '';
   try {
     const response = await fetch(REFERER_URL, {
       headers: {
@@ -289,6 +299,8 @@ async function fetchSessionCookies() {
         Referer: REFERER_URL,
       },
     });
+
+    body = await response.text();
 
     // `getSetCookie` é exposto no fetch do Node (undici). Ele devolve todas
     // as ocorrências de Set-Cookie; para o envio posterior só precisamos do
@@ -300,10 +312,34 @@ async function fetchSessionCookies() {
     } else {
       logWithTimestamp('Nenhum cookie de sessão retornado pela página inicial.');
     }
-    return parsed;
+    const hiddenFields = extractHiddenFields(body);
+    if (Object.keys(hiddenFields).length) {
+      logWithTimestamp(`Campos ocultos capturados: ${Object.keys(hiddenFields).join(', ')}.`);
+    }
+    return { cookies: parsed, hiddenFields };
   } catch (error) {
     logWithTimestamp(`Falha ao iniciar sessão antes do POST: ${error.message || error}`);
-    return [];
+    return { cookies: [], hiddenFields: {} };
+  }
+}
+
+function extractHiddenFields(html) {
+  try {
+    const $ = loadHtml(html);
+    const fields = {};
+
+    $('input[type="hidden"]').each((_, el) => {
+      const name = $(el).attr('name');
+      const value = $(el).attr('value') ?? '';
+      if (name) {
+        fields[name] = value;
+      }
+    });
+
+    return fields;
+  } catch (error) {
+    logWithTimestamp(`Não foi possível extrair campos ocultos do formulário: ${error.message || error}`);
+    return {};
   }
 }
 
