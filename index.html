@@ -529,6 +529,7 @@
         const triggerBtn = document.getElementById('trigger-btn');
 
       let lastEntryIds = new Set();
+      let lastRenderedHistory = [];
 
       function buildEntryId(entry, cpf) {
         return [cpf, entry.invoiceOrPickup || '', entry.orderOrRequest || '', entry.unit || '', entry.timestamp || '', entry.status || '']
@@ -608,7 +609,16 @@
           if (!response.ok) throw new Error('Falha ao buscar histórico');
           const payload = await response.json();
           if (!payload.ok) throw new Error(payload.error || 'Erro desconhecido');
-          renderHistory(payload.history || []);
+          const history = payload.history || [];
+          if (!history.length) {
+            if (!lastRenderedHistory.length) {
+              renderHistory(history);
+            }
+            refreshIndicator.innerHTML = '<span class="dot-live"></span> Nenhum histórico disponível';
+            return;
+          }
+
+          renderHistory(history);
           refreshIndicator.innerHTML = '<span class="dot-live"></span> Atualizado agora';
         } catch (error) {
           hintEl.textContent = error.message;
@@ -626,12 +636,14 @@
           statTotal.textContent = '0';
           statUpdated.textContent = '—';
           summaryTags.innerHTML = '';
+          lastRenderedHistory = [];
           return;
         }
 
         hintEl.style.display = 'none';
         timelineEl.innerHTML = '';
         summaryTags.innerHTML = '';
+        lastRenderedHistory = history;
 
         const currentIds = new Set();
         let totalEntries = 0;
