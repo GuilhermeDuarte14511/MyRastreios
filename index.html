@@ -540,6 +540,18 @@
           return (value || '').replace(/\D/g, '');
         }
 
+        function mapTrackPayloadToHistory(payload) {
+          if (!payload) return [];
+          return [
+            {
+              cpf: payload.cpf || '—',
+              total: payload.total ?? payload.entries?.length ?? 0,
+              updatedAt: new Date().toISOString(),
+              entries: payload.entries || [],
+            },
+          ];
+        }
+
         async function triggerManualRun() {
           const cpf = sanitizeCpf(cpfInput.value);
 
@@ -553,7 +565,7 @@
           triggerBtn.disabled = true;
           const previousLabel = triggerBtn.textContent;
           triggerBtn.textContent = 'Buscando...';
-          refreshIndicator.innerHTML = `<span class="dot-live"></span> Consultando a SSW para ${cpf}...`;
+            refreshIndicator.innerHTML = `<span class="dot-live"></span> Consultando a SSW para ${cpf}...`;
 
           try {
             const response = await fetch('/api/track', {
@@ -569,13 +581,14 @@
             payload = null;
           }
 
-          if (!response.ok) {
-            const message = payload?.error || `Falha ao consultar a SSW (HTTP ${response.status})`;
-            throw new Error(message);
-          }
+            if (!response.ok) {
+              const message = payload?.error || `Falha ao consultar a SSW (HTTP ${response.status})`;
+              throw new Error(message);
+            }
             if (!payload?.ok) throw new Error(payload?.error || 'Erro desconhecido');
 
             refreshIndicator.innerHTML = `<span class="dot-live"></span> Última consulta: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${payload.newEntries || 0})`;
+            renderHistory(mapTrackPayloadToHistory(payload));
             await fetchHistory();
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Erro desconhecido';

@@ -3,6 +3,7 @@ import {
   maskCpf,
   performTrackingCheck,
   sanitizeCpf,
+  sendNotificationEmail,
 } from '../src/rastreio.js';
 
 async function parseJsonBody(req) {
@@ -50,6 +51,15 @@ export default async function handler(req, res) {
     const result = await performTrackingCheck(cpf, { noCache: false });
     const totalNewEntries = result.diff.newEntries.length;
 
+    let emailSent = false;
+    if (totalNewEntries > 0) {
+      try {
+        emailSent = await sendNotificationEmail({ cpf, newEntries: result.diff.newEntries });
+      } catch (emailError) {
+        console.error(`[track] Falha ao enviar e-mail: ${emailError.message}`);
+      }
+    }
+
     res.status(200).json({
       ok: true,
       cpf: maskCpf(cpf),
@@ -57,6 +67,7 @@ export default async function handler(req, res) {
       newEntries: totalNewEntries,
       hadPreviousRun: result.hadPreviousRun,
       cacheUsed: !result.cacheDisabled,
+      emailSent,
       entries: result.entries,
     });
   } catch (error) {
