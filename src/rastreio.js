@@ -150,9 +150,9 @@ function maskCpf(value) {
 }
 
 async function performTrackingCheck(cpf, flags) {
-  const html = await fetchTrackingPage(cpf);
+  const { html, cookies } = await fetchTrackingPage(cpf);
   logWithTimestamp(`HTML baixado para ${maskCpf(cpf)} (tamanho ${html.length} bytes).`);
-  const entries = parseTrackingPage(html);
+  const entries = await enrichEntriesWithDetails(parseTrackingPage(html), cookies);
 
   let previousEntries = [];
   let cache = {};
@@ -225,7 +225,7 @@ async function fetchTrackingPage(cpf) {
   const firstAttempt = await postTrackingForm(params, session.cookies);
 
   if (firstAttempt.response.ok) {
-    return firstAttempt.body;
+    return { html: firstAttempt.body, cookies: session.cookies };
   }
 
   if ([401, 403].includes(firstAttempt.response.status)) {
@@ -235,13 +235,55 @@ async function fetchTrackingPage(cpf) {
     const retryAttempt = await postTrackingForm(retryParams, retrySession.cookies);
 
     if (retryAttempt.response.ok) {
-      return retryAttempt.body;
+      return { html: retryAttempt.body, cookies: retrySession.cookies };
     }
 
     throw buildSswError(retryAttempt.response, retryAttempt.body);
   }
 
   throw buildSswError(firstAttempt.response, firstAttempt.body);
+}
+
+async function enrichEntriesWithDetails(entries, cookies) {
+  const detailed = [];
+
+  for (const entry of entries) {
+    if (!entry.detailsUrl) {
+      detailed.push(entry);
+      continue;
+    }
+
+    try {
+      const html = await fetchDetailsPage(entry.detailsUrl, cookies);
+      const parsed = parseDetailsPage(html, entry);
+      if (parsed.length) {
+        detailed.push(...parsed);
+        continue;
+      }
+    } catch (error) {
+      logWithTimestamp(`Falha ao obter detalhes (${entry.detailsUrl}): ${error.message || error}`);
+    }
+
+    detailed.push(entry);
+  }
+
+  return detailed;
+}
+
+async function fetchDetailsPage(url, cookies) {
+  const response = await fetch(url, {
+    headers: {
+      Referer: REFERER_URL,
+      'User-Agent': 'MyRastreiosBot/1.1 (+https://github.com/GuilhermeDuarte14511/MyRastreios)',
+      ...(cookies?.length ? { Cookie: cookies.join('; ') } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw buildSswError(response, await response.text());
+  }
+
+  return response.text();
 }
 
 async function postTrackingForm(params, cookies) {
@@ -409,6 +451,62 @@ function parseTrackingPage(html) {
   }
 
   return rows;
+}
+
+function parseDetailsPage(html, parentEntry) {
+  try {
+    const $ = loadHtml(html);
+    let resultTable;
+
+    $('table').each((_, el) => {
+      const headers = $(el).find('td.tdresult');
+      if (headers.length >= 3) {
+        const label = normalizeText(headers.eq(0).text()).toLowerCase();
+        if (label.includes('data/hora')) {
+          resultTable = $(el);
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (!resultTable) {
+      return [];
+    }
+
+    const detailedEntries = [];
+
+    resultTable.find('tr').each((_, tr) => {
+      const cells = $(tr).find('td');
+      if (cells.length !== 3 || $(cells[0]).hasClass('tdresult')) {
+        return;
+      }
+
+      const dateLines = extractCellLines(cells.eq(0));
+      const unitLines = extractCellLines(cells.eq(1));
+      const statusTitle = normalizeText($(cells[2]).find('p.titulo').first().text());
+      const description = extractDescription($, $(cells[2]));
+
+      if (!statusTitle && !description && !dateLines.length && !unitLines.length) {
+        return;
+      }
+
+      detailedEntries.push({
+        invoiceOrPickup: parentEntry.invoiceOrPickup || '',
+        orderOrRequest: parentEntry.orderOrRequest || '',
+        unit: unitLines.join(' '),
+        timestamp: dateLines.join(' '),
+        status: statusTitle || 'Situação não informada',
+        description,
+        detailsUrl: parentEntry.detailsUrl || null,
+      });
+    });
+
+    return detailedEntries;
+  } catch (error) {
+    logWithTimestamp(`Não foi possível interpretar a página de detalhes: ${error.message || error}`);
+    return [];
+  }
 }
 
 function extractCellLines(cell) {
