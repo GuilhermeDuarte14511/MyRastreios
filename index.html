@@ -435,6 +435,28 @@
           <div class="value" id="stat-cpfs">– <span class="badge-trend">tempo real</span></div>
           <div class="small">Fonte: TRACKING_CPFS (ou padrão embutido)</div>
         </div>
+        <div class="hero-card">
+          <div class="hero-icon">⚡</div>
+          <p class="hero-text">
+            <strong>Execução instantânea</strong>
+            <span>Dispare manualmente a consulta sem depender do cron, e veja os resultados na hora.</span>
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-icon">🔒</div>
+          <p class="hero-text">
+            <strong>Confiável e seguro</strong>
+            <span>Cookies renovados automaticamente para evitar erros de autorização na SSW.</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="stats" id="stats">
+          <div class="card">
+            <h3>CPFs monitorados</h3>
+            <div class="value" id="stat-cpfs">–</div>
+            <div class="small">Informe o CPF e clique em Pesquisar para atualizar</div>
+          </div>
         <div class="card">
           <h3>Total de ocorrências</h3>
           <div class="value" id="stat-total">–</div>
@@ -459,20 +481,21 @@
 
     <div class="grid-two panel">
       <section>
-        <div class="panel-header">
-          <h3>Histórico</h3>
-          <div class="actions">
-            <button class="btn" id="trigger-btn" type="button">
-              <span>🔄</span>
-              Atualizar agora
-            </button>
-            <div class="refresh-indicator" id="last-refresh">
-              <span class="dot-live"></span>
-              Aguardando ação
+          <div class="panel-header">
+            <h3>Histórico</h3>
+            <div class="actions">
+              <input class="input" id="cpf-input" placeholder="Digite o CPF (somente números)" maxlength="14" />
+              <button class="btn" id="trigger-btn" type="button">
+                <span>🔎</span>
+                Pesquisar
+              </button>
+              <div class="refresh-indicator" id="last-refresh">
+                <span class="dot-live"></span>
+                Aguardando CPF
+              </div>
             </div>
             <span class="badge-soft">Auto refresh a cada 30s</span>
           </div>
-        </div>
         <ul class="timeline" id="timeline"></ul>
         <div class="hint" id="hint">Carregando histórico...</div>
       </section>
@@ -497,12 +520,13 @@
     <script>
       const timelineEl = document.getElementById('timeline');
       const hintEl = document.getElementById('hint');
-      const statCpfs = document.getElementById('stat-cpfs');
-      const statTotal = document.getElementById('stat-total');
-      const statUpdated = document.getElementById('stat-updated');
-      const refreshIndicator = document.getElementById('last-refresh');
-      const summaryTags = document.getElementById('summary-tags');
-      const triggerBtn = document.getElementById('trigger-btn');
+        const cpfInput = document.getElementById('cpf-input');
+        const statCpfs = document.getElementById('stat-cpfs');
+        const statTotal = document.getElementById('stat-total');
+        const statUpdated = document.getElementById('stat-updated');
+        const refreshIndicator = document.getElementById('last-refresh');
+        const summaryTags = document.getElementById('summary-tags');
+        const triggerBtn = document.getElementById('trigger-btn');
 
       let lastEntryIds = new Set();
 
@@ -512,17 +536,34 @@
           .join('|');
       }
 
-      async function triggerManualRun() {
-        triggerBtn.disabled = true;
-        const previousLabel = triggerBtn.textContent;
-        triggerBtn.textContent = 'Atualizando...';
-        refreshIndicator.innerHTML = '<span class="dot-live"></span> Consultando a SSW...';
+        function sanitizeCpf(value) {
+          return (value || '').replace(/\D/g, '');
+        }
 
-        try {
-          const response = await fetch('/api/cron', { method: 'POST' });
-          let payload;
+        async function triggerManualRun() {
+          const cpf = sanitizeCpf(cpfInput.value);
+
+          if (cpf.length !== 11) {
+            const message = 'Informe um CPF válido com 11 dígitos.';
+            refreshIndicator.textContent = message;
+            hintEl.textContent = message;
+            return;
+          }
+
+          triggerBtn.disabled = true;
+          const previousLabel = triggerBtn.textContent;
+          triggerBtn.textContent = 'Buscando...';
+          refreshIndicator.innerHTML = `<span class="dot-live"></span> Consultando a SSW para ${cpf}...`;
+
           try {
-            payload = await response.json();
+            const response = await fetch('/api/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cpf }),
+            });
+            let payload;
+            try {
+              payload = await response.json();
           } catch (parseError) {
             console.warn('Não foi possível interpretar a resposta do servidor.', parseError);
             payload = null;
@@ -532,15 +573,14 @@
             const message = payload?.error || `Falha ao consultar a SSW (HTTP ${response.status})`;
             throw new Error(message);
           }
-          if (!payload?.ok) throw new Error(payload?.error || 'Erro desconhecido');
+            if (!payload?.ok) throw new Error(payload?.error || 'Erro desconhecido');
 
-          const totalNew = payload.results.reduce((acc, item) => acc + (item.newEntries || 0), 0);
-          refreshIndicator.innerHTML = `<span class="dot-live"></span> Última execução manual: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${totalNew})`;
-          await fetchHistory();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Erro desconhecido';
-          refreshIndicator.textContent = message;
-          hintEl.textContent = message;
+            refreshIndicator.innerHTML = `<span class="dot-live"></span> Última consulta: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${payload.newEntries || 0})`;
+            await fetchHistory();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            refreshIndicator.textContent = message;
+            hintEl.textContent = message;
           console.error('[manual-run]', error);
         } finally {
           triggerBtn.disabled = false;
@@ -626,9 +666,8 @@
           : '—';
       }
 
-      fetchHistory();
-      triggerBtn.addEventListener('click', triggerManualRun);
-      setInterval(fetchHistory, 30_000);
+        fetchHistory();
+        triggerBtn.addEventListener('click', triggerManualRun);
     </script>
   </body>
 </html>
