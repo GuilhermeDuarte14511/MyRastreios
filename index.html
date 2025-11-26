@@ -11,17 +11,19 @@
     <style>
       :root {
         color-scheme: light dark;
-        --bg: radial-gradient(circle at 20% 20%, #0d111d, #080a12 55%);
-        --card: rgba(255, 255, 255, 0.04);
-        --card-strong: rgba(255, 255, 255, 0.08);
+        --bg: radial-gradient(circle at 20% 20%, #0f172a, #0b1021 60%),
+          linear-gradient(145deg, rgba(139, 92, 246, 0.18), rgba(34, 211, 238, 0.12));
+        --surface: rgba(255, 255, 255, 0.02);
+        --card: rgba(255, 255, 255, 0.06);
+        --card-strong: rgba(255, 255, 255, 0.1);
         --border: rgba(255, 255, 255, 0.08);
         --accent: #8b5cf6;
         --accent-2: #22d3ee;
         --success: #4ade80;
         --muted: #9ca3af;
         --text: #e5e7eb;
-        --glow: 0 16px 60px rgba(0, 0, 0, 0.35);
-        --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.25);
+        --glow: 0 18px 80px rgba(0, 0, 0, 0.35);
+        --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.28);
       }
       * {
         box-sizing: border-box;
@@ -36,19 +38,31 @@
         flex-direction: column;
       }
       header {
-        padding: 32px 24px 8px;
+        padding: 28px 28px 12px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
         align-items: flex-start;
+        position: relative;
+        overflow: hidden;
+      }
+      header::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 20% 40%, rgba(34, 211, 238, 0.12), transparent 36%),
+          radial-gradient(circle at 80% 0%, rgba(139, 92, 246, 0.16), transparent 40%);
+        pointer-events: none;
       }
       header h1 {
         margin: 0;
-        font-size: 32px;
+        font-size: clamp(30px, 4vw, 38px);
         letter-spacing: -0.02em;
         display: flex;
         gap: 10px;
         align-items: center;
+        position: relative;
+        z-index: 1;
       }
       header h1 span {
         background: linear-gradient(120deg, var(--accent), var(--accent-2));
@@ -58,38 +72,63 @@
       header p {
         margin: 0;
         color: var(--muted);
-        max-width: 800px;
+        max-width: 900px;
         line-height: 1.6;
+        position: relative;
+        z-index: 1;
       }
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
         gap: 12px;
         width: 100%;
+        position: relative;
+        z-index: 1;
       }
       .card {
         border: 1px solid var(--border);
         background: var(--card);
         border-radius: 16px;
         padding: 16px 18px;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
         box-shadow: var(--shadow-sm);
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, rgba(139, 92, 246, 0.1), rgba(34, 211, 238, 0));
+        opacity: 0;
+        transition: opacity 200ms ease;
+      }
+      .card:hover::before {
+        opacity: 1;
       }
       .card h3 {
         margin: 0 0 6px;
-        font-size: 15px;
+        font-size: 13px;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
       }
       .card .value {
-        font-size: 28px;
-        font-weight: 700;
+        font-size: 30px;
+        font-weight: 800;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .card .meta-inline {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--muted);
       }
       .grid-two {
         display: grid;
-        gap: 12px;
-        grid-template-columns: 2fr 1fr;
+        gap: 14px;
+        grid-template-columns: 1.65fr 1fr;
         width: 100%;
       }
       .panel {
@@ -106,6 +145,7 @@
         align-items: center;
         gap: 12px;
         margin-bottom: 12px;
+        flex-wrap: wrap;
       }
       .panel-header h3 {
         margin: 0;
@@ -120,6 +160,13 @@
         align-items: center;
         font-size: 14px;
         color: var(--muted);
+      }
+      .badge-soft {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(34, 211, 238, 0.14);
+        color: #e0f2fe;
+        border: 1px solid rgba(34, 211, 238, 0.25);
       }
       .dot-live {
         width: 10px;
@@ -153,7 +200,7 @@
       }
       .timeline-item {
         display: grid;
-        grid-template-columns: 16px 1fr;
+        grid-template-columns: 18px 1fr;
         gap: 14px;
         padding: 10px 0;
         position: relative;
@@ -161,7 +208,7 @@
       .timeline-item::before {
         content: '';
         position: absolute;
-        left: 6px;
+        left: 7px;
         top: 0;
         bottom: 0;
         width: 2px;
@@ -180,11 +227,14 @@
       }
       .item-body {
         border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.02);
+        background: var(--surface);
         border-radius: 14px;
         padding: 14px 16px;
         box-shadow: var(--shadow-sm);
-        transition: transform 160ms ease, border-color 160ms ease;
+        transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+      }
+      .item-body:hover {
+        background: rgba(255, 255, 255, 0.04);
       }
       .item-body.new {
         border-color: rgba(34, 211, 238, 0.9);
@@ -270,26 +320,83 @@
         align-items: center;
         flex-wrap: wrap;
       }
-      .btn {
-        background: linear-gradient(120deg, var(--accent), var(--accent-2));
-        border: none;
-        color: #0b0e16;
-        font-weight: 700;
-        padding: 12px 16px;
-        border-radius: 12px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: var(--shadow-sm);
-        transition: transform 120ms ease, opacity 120ms ease;
-      }
-      .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
+        .btn {
+          background: linear-gradient(120deg, var(--accent), var(--accent-2));
+          border: none;
+          color: #0b0e16;
+          font-weight: 700;
+          padding: 12px 16px;
+          border-radius: 12px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: var(--shadow-sm);
+          transition: transform 120ms ease, opacity 120ms ease, filter 120ms ease;
+        }
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .btn:not(:disabled):hover {
+          filter: brightness(1.08);
+        }
+        .input {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 12px 14px;
+          color: #fff;
+          font-size: 15px;
+          min-width: 240px;
+          outline: none;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+        .input:focus {
+          border-color: rgba(34, 211, 238, 0.6);
+          box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+        }
       .btn:not(:disabled):active {
         transform: translateY(1px);
+      }
+      .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 10px;
+        width: 100%;
+        margin-top: 6px;
+      }
+      .hero-card {
+        background: var(--card-strong);
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .hero-icon {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        font-size: 20px;
+      }
+      .hero-text { margin: 0; }
+      .hero-text strong { color: #fff; display: block; margin-bottom: 4px; }
+      .hero-text span { color: var(--muted); font-size: 13px; }
+      .badge-trend { color: #c7d2fe; font-weight: 600; }
+      .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chip {
+        padding: 6px 10px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #e5e7eb;
+        border: 1px solid var(--border);
+        font-size: 12px;
       }
       @media (max-width: 960px) {
         .grid-two {
@@ -307,50 +414,80 @@
   <body>
     <header>
       <div class="pill"><span class="dot-live"></span> Acionamento manual sob demanda</div>
-      <h1>Monitor de <span>Rastreios</span></h1>
-      <p>
-        Painel para consultar manualmente a SSW e enviar e-mails via SendGrid sempre que um novo status aparece. Os dados
-        abaixo são lidos do cache mantido no servidor.
-      </p>
-      <div class="stats" id="stats">
-        <div class="card">
-          <h3>CPFs monitorados</h3>
-          <div class="value" id="stat-cpfs">–</div>
-          <div class="small">Fonte: TRACKING_CPFS (ou padrão embutido)</div>
+        <h1>Monitor de <span>Rastreios</span></h1>
+        <p>
+          Painel visual para consultar manualmente a SSW, enxergar os status mais recentes e disparar e-mails via SendGrid
+          sempre que algo novo aparecer. Tudo pronto para telas grandes ou mobile, com feedback em tempo real.
+        </p>
+
+      <div class="hero-grid">
+        <div class="hero-card">
+          <div class="hero-icon">🛰️</div>
+          <p class="hero-text">
+            <strong>Monitoramento inteligente</strong>
+            <span>Cacheado no servidor e pronto para alertas imediatos a cada nova atualização.</span>
+          </p>
         </div>
+        <div class="hero-card">
+          <div class="hero-icon">⚡</div>
+          <p class="hero-text">
+            <strong>Execução instantânea</strong>
+            <span>Dispare manualmente a consulta sem depender do cron, e veja os resultados na hora.</span>
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="hero-icon">🔒</div>
+          <p class="hero-text">
+            <strong>Confiável e seguro</strong>
+            <span>Cookies renovados automaticamente para evitar erros de autorização na SSW.</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="stats" id="stats">
+          <div class="card">
+            <h3>CPFs monitorados</h3>
+            <div class="value" id="stat-cpfs">–</div>
+            <div class="small">Informe o CPF e clique em Pesquisar para atualizar</div>
+          </div>
         <div class="card">
           <h3>Total de ocorrências</h3>
           <div class="value" id="stat-total">–</div>
-          <div class="small">Soma de todas as linhas rastreadas</div>
+          <div class="meta-inline">Soma de todas as linhas rastreadas</div>
+          <div class="chip-row">
+            <span class="chip">Ordenado por atualização</span>
+            <span class="chip">Timeline enriquecida</span>
+          </div>
         </div>
         <div class="card">
           <h3>Última atualização</h3>
           <div class="value" id="stat-updated">–</div>
-          <div class="small">A partir do cache salvo</div>
+          <div class="meta-inline">Baseado no cache salvo pelo worker</div>
         </div>
         <div class="card">
           <h3>Envio de alertas</h3>
           <div class="value" id="stat-sendgrid">Configurado</div>
-          <div class="small">De barbershopperbrasil@outlook.com para gui14511@gmail.com</div>
+          <div class="meta-inline">De barbershopperbrasil@outlook.com para gui14511@gmail.com</div>
         </div>
       </div>
     </header>
 
     <div class="grid-two panel">
       <section>
-        <div class="panel-header">
-          <h3>Histórico</h3>
-          <div class="actions">
-            <button class="btn" id="trigger-btn" type="button">
-              <span>🔄</span>
-              Atualizar agora
-            </button>
-            <div class="refresh-indicator" id="last-refresh">
-              <span class="dot-live"></span>
-              Aguardando ação
+          <div class="panel-header">
+            <h3>Histórico</h3>
+            <div class="actions">
+              <input class="input" id="cpf-input" placeholder="Digite o CPF (somente números)" maxlength="14" />
+              <button class="btn" id="trigger-btn" type="button">
+                <span>🔎</span>
+                Pesquisar
+              </button>
+              <div class="refresh-indicator" id="last-refresh">
+                <span class="dot-live"></span>
+                Aguardando CPF
+              </div>
             </div>
           </div>
-        </div>
         <ul class="timeline" id="timeline"></ul>
         <div class="hint" id="hint">Carregando histórico...</div>
       </section>
@@ -375,12 +512,13 @@
     <script>
       const timelineEl = document.getElementById('timeline');
       const hintEl = document.getElementById('hint');
-      const statCpfs = document.getElementById('stat-cpfs');
-      const statTotal = document.getElementById('stat-total');
-      const statUpdated = document.getElementById('stat-updated');
-      const refreshIndicator = document.getElementById('last-refresh');
-      const summaryTags = document.getElementById('summary-tags');
-      const triggerBtn = document.getElementById('trigger-btn');
+        const cpfInput = document.getElementById('cpf-input');
+        const statCpfs = document.getElementById('stat-cpfs');
+        const statTotal = document.getElementById('stat-total');
+        const statUpdated = document.getElementById('stat-updated');
+        const refreshIndicator = document.getElementById('last-refresh');
+        const summaryTags = document.getElementById('summary-tags');
+        const triggerBtn = document.getElementById('trigger-btn');
 
       let lastEntryIds = new Set();
 
@@ -390,17 +528,34 @@
           .join('|');
       }
 
-      async function triggerManualRun() {
-        triggerBtn.disabled = true;
-        const previousLabel = triggerBtn.textContent;
-        triggerBtn.textContent = 'Atualizando...';
-        refreshIndicator.innerHTML = '<span class="dot-live"></span> Consultando a SSW...';
+        function sanitizeCpf(value) {
+          return (value || '').replace(/\D/g, '');
+        }
 
-        try {
-          const response = await fetch('/api/cron', { method: 'POST' });
-          let payload;
+        async function triggerManualRun() {
+          const cpf = sanitizeCpf(cpfInput.value);
+
+          if (cpf.length !== 11) {
+            const message = 'Informe um CPF válido com 11 dígitos.';
+            refreshIndicator.textContent = message;
+            hintEl.textContent = message;
+            return;
+          }
+
+          triggerBtn.disabled = true;
+          const previousLabel = triggerBtn.textContent;
+          triggerBtn.textContent = 'Buscando...';
+          refreshIndicator.innerHTML = `<span class="dot-live"></span> Consultando a SSW para ${cpf}...`;
+
           try {
-            payload = await response.json();
+            const response = await fetch('/api/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cpf }),
+            });
+            let payload;
+            try {
+              payload = await response.json();
           } catch (parseError) {
             console.warn('Não foi possível interpretar a resposta do servidor.', parseError);
             payload = null;
@@ -410,15 +565,14 @@
             const message = payload?.error || `Falha ao consultar a SSW (HTTP ${response.status})`;
             throw new Error(message);
           }
-          if (!payload?.ok) throw new Error(payload?.error || 'Erro desconhecido');
+            if (!payload?.ok) throw new Error(payload?.error || 'Erro desconhecido');
 
-          const totalNew = payload.results.reduce((acc, item) => acc + (item.newEntries || 0), 0);
-          refreshIndicator.innerHTML = `<span class="dot-live"></span> Última execução manual: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${totalNew})`;
-          await fetchHistory();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Erro desconhecido';
-          refreshIndicator.textContent = message;
-          hintEl.textContent = message;
+            refreshIndicator.innerHTML = `<span class="dot-live"></span> Última consulta: ${new Date().toLocaleTimeString('pt-BR')} (novos status: ${payload.newEntries || 0})`;
+            await fetchHistory();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            refreshIndicator.textContent = message;
+            hintEl.textContent = message;
           console.error('[manual-run]', error);
         } finally {
           triggerBtn.disabled = false;
@@ -504,9 +658,8 @@
           : '—';
       }
 
-      fetchHistory();
-      triggerBtn.addEventListener('click', triggerManualRun);
-      setInterval(fetchHistory, 30_000);
+        fetchHistory();
+        triggerBtn.addEventListener('click', triggerManualRun);
     </script>
   </body>
 </html>
